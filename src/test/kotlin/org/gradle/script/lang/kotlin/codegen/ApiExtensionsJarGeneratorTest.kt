@@ -24,7 +24,7 @@ class ApiExtensionsJarGeneratorTest : TestWithTempFiles() {
         ApiExtensionsJarGenerator(NullCompiler).generate(outputFile, inputFile, listOf(inputFile))
 
         assertThat(
-            textForEntryOf(outputFile, "org/gradle/script/lang/kotlin/ActionExtensions.kt"),
+            textForEntryOf(file("extensions-sources.jar"), "org/gradle/script/lang/kotlin/ActionExtensions.kt"),
             containsString(
                 firstLinesOf(
                     kdocFor("org.gradle.api.Project.allprojects(org.gradle.api.Project.() -> Unit)"))))

@@ -29,6 +29,7 @@ import org.gradle.api.internal.artifacts.dsl.dependencies.DependencyFactory
 
 import org.gradle.internal.classpath.ClassPath
 import org.gradle.internal.classpath.DefaultClassPath
+import org.gradle.script.lang.kotlin.codegen.sourcesJarFor
 
 import org.gradle.util.GFileUtils.moveFile
 
@@ -109,6 +110,10 @@ class KotlinScriptClassPathProvider(
         val tempFile = tempFileFor(outputFile)
         generate(tempFile)
         moveFile(tempFile, outputFile)
+        val sources = sourcesJarFor(tempFile)
+        if (sources.exists()) {
+            moveFile(sources, sourcesJarFor(outputFile))
+        }
     }
 
     private fun progressMonitorFor(outputFile: File, totalWork: Int): ProgressMonitor =

@@ -33,14 +33,23 @@ interface KotlinFileCompiler {
 }
 
 internal
+fun sourcesJarFor(jar: File) = File(jar.parentFile, "${jar.nameWithoutExtension}-sources.${jar.extension}")
+
+internal
 class ApiExtensionsJarGenerator(
     val compiler: KotlinFileCompiler = StandardKotlinFileCompiler,
     val onProgress: () -> Unit = {}) {
 
     fun generate(outputFile: File, inputApiJar: File, gradleJars: Collection<File> = emptyList()) {
         val tempDir = tempDirFor(outputFile)
-        compileExtensionsTo(tempDir, inputApiJar, gradleJars)
-        zipTo(outputFile, tempDir)
+        val sourceDir = File(tempDir, "src")
+        val sourceFiles = listOf(
+            builtinPluginIdExtensionsSourceFileFor(gradleJars, sourceDir),
+            actionExtensionsSourceFileFor(inputApiJar, sourceDir))
+        val outputDir = File(tempDir, "classes")
+        compileToDirectory(outputDir, sourceFiles, gradleJars)
+        zipTo(outputFile, outputDir)
+        zipTo(sourcesJarFor(outputFile), sourceDir)
     }
 
     private fun tempDirFor(outputFile: File): File =
@@ -48,13 +57,8 @@ class ApiExtensionsJarGenerator(
             deleteOnExit()
         }
 
-    private fun compileExtensionsTo(outputDir: File, inputApiJar: File, gradleJars: Collection<File>) {
-        compiler.compileToDirectory(
-            outputDir,
-            listOf(
-                builtinPluginIdExtensionsSourceFileFor(gradleJars, outputDir),
-                actionExtensionsSourceFileFor(inputApiJar, outputDir)),
-            classPath = gradleJars)
+    private fun compileToDirectory(outputDir: File, sourceFiles: List<File>, classPath: Collection<File>) {
+        compiler.compileToDirectory(outputDir, sourceFiles, classPath = classPath)
     }
 
     private fun builtinPluginIdExtensionsSourceFileFor(gradleJars: Iterable<File>, outputDir: File) =

@@ -16,6 +16,7 @@
 
 package org.gradle.script.lang.kotlin.support
 
+import org.gradle.script.lang.kotlin.codegen.sourcesJarFor
 import org.gradle.script.lang.kotlin.provider.KotlinScriptPluginFactory
 
 import org.gradle.tooling.GradleConnector
@@ -47,11 +48,19 @@ object DefaultKotlinBuildScriptModelProvider : KotlinBuildScriptModelProvider {
 object DefaultSourcePathProvider : SourcePathProvider {
 
     override fun sourcePathFor(request: KotlinBuildScriptModelRequest, response: KotlinBuildScriptModel): Collection<File> {
-        val gradleScriptKotlinJar = response.classPath.filter { it.name.startsWith("gradle-script-kotlin-") }
+        val gradleScriptKotlinJar = sourceJarsFor(response.classPath)
         val projectBuildSrcRoots = buildSrcRootsOf(request.projectDir)
         val gradleSourceRoots = sourceRootsOf(request.gradleInstallation)
         return gradleScriptKotlinJar + projectBuildSrcRoots + gradleSourceRoots
     }
+
+    private fun sourceJarsFor(classPath: List<File>) =
+        classPath
+            .filter { it.name.startsWith("gradle-script-kotlin-") && it.isFile }
+            .map { jar ->
+                val sourceJar = sourcesJarFor(jar)
+                if (sourceJar.exists()) sourceJar else jar
+            }
 
     /**
      * Returns all conventional source directories under buildSrc if any.
