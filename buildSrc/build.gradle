@@ -1,8 +1,14 @@
 buildscript {
-    ext.kotlinVersion = file('../kotlin-version.txt').text.trim()
+    def kotlinProperties = new Properties()
+    file("../kotlin.properties").withInputStream {
+        kotlinProperties.load(it)
+    }
+    ext.kotlinRepo = kotlinProperties["repository"]
+    ext.kotlinVersion = kotlinProperties["version"]
 
     configure([repositories, project.repositories]) {
-        maven { url 'https://repo.gradle.org/gradle/repo' }
+        maven { url kotlinRepo }
+        maven { url 'https://repo.gradle.org/gradle/libs-releases' }
     }
 
     dependencies {

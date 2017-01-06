@@ -21,10 +21,13 @@ import org.jfrog.gradle.plugin.artifactory.dsl.ResolverConfig
 import java.io.File
 
 buildscript {
+    var kotlinProperties = java.util.Properties().apply {
+        file("kotlin.properties").inputStream().use { load(it) }
+    }
     var kotlinVersion: String by extra
-    kotlinVersion = file("kotlin-version.txt").readText().trim()
+    kotlinVersion = kotlinProperties.getProperty("version")
     var kotlinRepo: String by extra
-    kotlinRepo = "https://repo.gradle.org/gradle/repo"
+    kotlinRepo = kotlinProperties.getProperty("repository")
 
     repositories {
         maven { setUrl(kotlinRepo) }
@@ -226,9 +229,11 @@ configure<ArtifactoryPluginConvention> {
             invokeMethod("publications", "mavenJava")
         })
     })
-    resolve(delegateClosureOf<ResolverConfig> {
-        setProperty("repoKey", "repo")
-    })
+}
+
+repositories {
+    maven { setUrl("https://repo.gradle.org/gradle/libs-snapshots") }
+    maven { setUrl(kotlinRepo) }
 }
 
 
