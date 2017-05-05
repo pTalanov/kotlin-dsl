@@ -19,16 +19,15 @@ package org.gradle.script.lang.kotlin.provider
 import org.gradle.script.lang.kotlin.support.loggerFor
 
 import org.gradle.api.Project
+import org.gradle.api.initialization.Settings
 
 import org.gradle.configuration.ScriptPlugin
 
 import org.gradle.groovy.scripts.ScriptSource
 
-import java.lang.IllegalArgumentException
-
 class KotlinScriptPlugin(
     val scriptSource: ScriptSource,
-    val script: (Project) -> Unit) : ScriptPlugin {
+    val script: (Any) -> Unit) : ScriptPlugin {
 
     private
     val logger = loggerFor<KotlinScriptPlugin>()
@@ -37,12 +36,16 @@ class KotlinScriptPlugin(
 
     override fun apply(target: Any) {
         logger.debug("Applying Kotlin script to {}", target)
-        if (target !is Project) {
-            throw IllegalArgumentException("target $target was not a Project as expected")
-        }
-        target.run {
-            plugins.apply(KotlinScriptBasePlugin::class.java)
+        when (target) {
+            is Project  -> applyBaseProjectPlugin(target)
+            is Settings -> Unit
+            else        -> unsupportedTarget(target)
         }
         script(target)
+    }
+
+    private
+    fun applyBaseProjectPlugin(target: Project) {
+        target.plugins.apply(KotlinScriptBasePlugin::class.java)
     }
 }
