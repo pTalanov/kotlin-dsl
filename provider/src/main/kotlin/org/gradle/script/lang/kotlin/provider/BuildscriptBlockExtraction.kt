@@ -16,6 +16,7 @@
 
 package org.gradle.script.lang.kotlin.provider
 
+import org.jetbrains.kotlin.com.intellij.psi.tree.IElementType
 import org.jetbrains.kotlin.lexer.KotlinLexer
 import org.jetbrains.kotlin.lexer.KtTokens.*
 
@@ -88,16 +89,34 @@ fun KotlinLexer.skipWhiteSpaceAndComments() {
 
 private
 fun KotlinLexer.findTopLevelIdentifier(identifier: String): Int? {
+
+    class PreviousTokens {
+
+        var last: IElementType? = null
+        var beforeLast: IElementType? = null
+
+        fun push(token: IElementType) {
+            beforeLast = last
+            last = token
+        }
+
+        val isMemberPrefix
+            get() = last != null
+                && (last == DOT || (last in WHITE_SPACE_OR_COMMENT_BIT_SET && beforeLast == DOT))
+    }
+
+    val previousTokens = PreviousTokens()
     var depth: Int = 0
     while (tokenType != null) {
         when (tokenType) {
             IDENTIFIER ->
-                if (depth == 0 && tokenText == identifier) {
+                if (depth == 0 && tokenText == identifier && !previousTokens.isMemberPrefix) {
                     return tokenStart
                 }
             LBRACE -> depth += 1
             RBRACE -> depth -= 1
         }
+        previousTokens.push(tokenType!!)
         advance()
     }
     return null
