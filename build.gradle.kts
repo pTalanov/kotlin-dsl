@@ -10,10 +10,12 @@ buildscript {
 
     val kotlinRepo: String by extra
     repositories {
+        mavenLocal()
         maven { url = uri(kotlinRepo) }
     }
 
     val kotlinVersion: String by extra
+    println("VERSION: $kotlinVersion !!!!")
     dependencies {
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
     }
@@ -27,6 +29,11 @@ plugins {
 allprojects {
     group = "org.gradle"
     version = "0.10.0-SNAPSHOT"
+
+
+    repositories {
+        mavenLocal()
+    }
 }
 
 val pluginsCurrentVersion by extra { "0.10.7" }

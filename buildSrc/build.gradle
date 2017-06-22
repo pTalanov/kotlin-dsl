@@ -2,6 +2,7 @@ buildscript {
     ext.kotlinVersion = file('../kotlin-version.txt').text.trim()
 
     configure([repositories, project.repositories]) {
+        mavenLocal()
         maven { url 'https://repo.gradle.org/gradle/repo' }
     }
 

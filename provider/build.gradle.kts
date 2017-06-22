@@ -7,6 +7,13 @@ plugins {
     java // so we can benefit from the `java` accessor below
 }
 
+repositories {
+    mavenLocal()
+    maven {
+        setUrl("https://dl.bintray.com/kotlin/kotlinx/")
+    }
+}
+
 base {
     archivesBaseName = "gradle-kotlin-dsl"
 }
@@ -16,9 +23,10 @@ dependencies {
 
     compile(project(":compiler-plugin"))
     compile(project(":tooling-models"))
-    compile(kotlin("stdlib"))
-    compile(kotlin("reflect"))
-    compile(kotlin("compiler-embeddable"))
+    compile(kotlin2("stdlib"))
+    compile(kotlin2("reflect"))
+    compile(kotlin2("compiler-embeddable"))
+    compile("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:0.16")
 
     testCompile(project(":test-fixtures"))
 }
@@ -68,7 +76,9 @@ tasks {
 withParallelTests()
 
 // --- Utility functions -----------------------------------------------
-fun kotlin(module: String) = "org.jetbrains.kotlin:kotlin-$module:$kotlinVersion"
+fun kotlin2(module: String) = "org.jetbrains.kotlin:kotlin-$module:$kotlinVersion".also {
+    println(it)
+}
 
 inline
 fun <reified T : Task> task(noinline configuration: T.() -> Unit) = tasks.creating(T::class, configuration)

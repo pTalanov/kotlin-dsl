@@ -66,5 +66,3 @@ plugins.forEach { plugin ->
 }
 
 
-// --- Utility functions -----------------------------------------------
-fun kotlin(module: String) = "org.jetbrains.kotlin:kotlin-$module:$kotlinVersion"
