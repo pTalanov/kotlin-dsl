@@ -18,28 +18,15 @@ package org.gradle.kotlin.dsl.provider
 
 import org.gradle.cache.PersistentCache
 import org.gradle.cache.internal.CacheKeyBuilder.CacheKeySpec
-
 import org.gradle.internal.classpath.ClassPath
 import org.gradle.internal.logging.progress.ProgressLoggerFactory
-
 import org.gradle.kotlin.dsl.KotlinBuildScript
 import org.gradle.kotlin.dsl.cache.ScriptCache
-
-import org.gradle.kotlin.dsl.support.loggerFor
-import org.gradle.kotlin.dsl.support.ImplicitImports
-import org.gradle.kotlin.dsl.support.KotlinBuildscriptBlock
-import org.gradle.kotlin.dsl.support.KotlinPluginsBlock
-import org.gradle.kotlin.dsl.support.compileKotlinScriptToDirectory
-import org.gradle.kotlin.dsl.support.messageCollectorFor
-
-import org.jetbrains.kotlin.com.intellij.openapi.project.Project
-
+import org.gradle.kotlin.dsl.support.*
 import org.jetbrains.kotlin.script.KotlinScriptDefinition
-
 import java.io.File
-
 import kotlin.reflect.KClass
-import kotlin.script.dependencies.KotlinScriptExternalDependencies
+import kotlin.script.dependencies.*
 
 
 internal
@@ -188,15 +175,14 @@ class CachingKotlinCompiler(
     fun scriptDefinitionFromTemplate(template: KClass<out Any>) =
 
         object : KotlinScriptDefinition(template) {
-
-            override fun <TF : Any> getDependenciesFor(
-                file: TF,
-                project: Project,
-                previousDependencies: KotlinScriptExternalDependencies?): KotlinScriptExternalDependencies? =
-
-                object : KotlinScriptExternalDependencies {
-                    override val imports: Iterable<String>
-                        get() = implicitImports.list
+            override val dependencyResolver: ScriptDependenciesResolver
+                get() = object : ScriptDependenciesResolver {
+                    override fun resolve(
+                        scriptContents: ScriptContents,
+                        environment: Environment
+                    ) = ScriptDependencyResult.Success(object : ScriptDependencies {
+                        override val imports = implicitImports.list
+                    })
                 }
         }
 
