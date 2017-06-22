@@ -16,11 +16,10 @@
 
 package org.gradle.kotlin.dsl.resolver
 
-import kotlin.script.dependencies.KotlinScriptExternalDependencies
-
 import org.gradle.kotlin.dsl.tooling.models.KotlinBuildScriptModel
 
 import java.io.File
+import kotlin.script.dependencies.ScriptDependencies
 
 
 internal
@@ -43,7 +42,7 @@ internal
 data class ResolvedToPrevious(
     val scriptFile: File?,
     val environment: Map<String, Any?>?,
-    val previousDependencies: KotlinScriptExternalDependencies?) : ResolverEvent()
+    val previousDependencies: ScriptDependencies?) : ResolverEvent()
 
 
 internal
@@ -61,4 +60,4 @@ data class ReceivedModelResponse(
 internal
 data class ResolvedDependencies(
     val scriptFile: File?,
-    val dependencies: KotlinScriptExternalDependencies) : ResolverEvent()
+    val dependencies: ScriptDependencies) : ResolverEvent()

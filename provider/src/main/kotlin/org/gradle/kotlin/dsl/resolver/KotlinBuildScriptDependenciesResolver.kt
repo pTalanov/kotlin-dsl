@@ -17,58 +17,79 @@
 package org.gradle.kotlin.dsl.resolver
 
 import org.gradle.kotlin.dsl.tooling.models.KotlinBuildScriptModel
-
-import org.gradle.kotlin.dsl.concurrent.future
-
 import org.gradle.tooling.ProgressListener
-
+import org.jetbrains.kotlin.com.intellij.util.containers.SoftKeySoftValueHashMap
 import java.io.File
-
 import java.net.URI
-
 import java.security.MessageDigest
-
+import java.util.*
 import java.util.Arrays.equals
-
-import kotlin.script.dependencies.KotlinScriptExternalDependencies
-import kotlin.script.dependencies.ScriptContents
-import kotlin.script.dependencies.ScriptDependenciesResolver
+import kotlin.script.dependencies.*
+import kotlin.script.dependencies.experimental.AsyncScriptDependenciesResolver
 
 
-internal
-typealias Environment = Map<String, Any?>
+class KotlinBuildScriptDependenciesResolver : AsyncScriptDependenciesResolver {
 
+    private class CacheKey(val filePath: String, val buildscriptBlockHash: ByteArray) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other?.javaClass != javaClass) return false
 
-class KotlinBuildScriptDependenciesResolver : ScriptDependenciesResolver {
+            other as CacheKey
 
-    override fun resolve(
-        script: ScriptContents,
-        environment: Map<String, Any?>?,
-        report: (ScriptDependenciesResolver.ReportSeverity, String, ScriptContents.Position?) -> Unit,
-        previousDependencies: KotlinScriptExternalDependencies?) = future {
+            if (filePath != other.filePath) return false
+            if (!equals(buildscriptBlockHash, other.buildscriptBlockHash)) return false
 
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = filePath.hashCode()
+            result = 31 * result + Arrays.hashCode(buildscriptBlockHash)
+            return result
+        }
+    }
+
+    private val cache = SoftKeySoftValueHashMap<CacheKey, ScriptDependencyResult>()
+
+    override suspend fun resolveAsync(
+        scriptContents: ScriptContents,
+        environment: Environment
+    ): ScriptDependencyResult {
         try {
-            val action = ResolverCoordinator.selectNextActionFor(script, environment, previousDependencies)
-            when (action) {
-                is ResolverAction.ReturnPrevious -> {
-                    log(ResolvedToPrevious(script.file, environment, previousDependencies))
-                    previousDependencies
-                }
-                is ResolverAction.RequestNew     -> {
-                    assembleDependenciesFrom(script.file, environment!!, action.buildscriptBlockHash)
+            val cacheKey = createCacheKey(scriptContents, environment)
+            if (cacheKey != null) {
+                val previousResult = synchronized(cache) { cache[cacheKey] }
+                if (previousResult != null) {
+                    log(ResolvedToPrevious(scriptContents.file, environment, previousResult.dependencies))
+                    return previousResult
                 }
             }
+
+            return assembleDependenciesFrom(scriptContents.file, environment).also {
+                if (cacheKey != null) {
+                    synchronized(cache) { cache[cacheKey] = it }
+                }
+            }
+
         } catch (e: Exception) {
-            log(ResolutionFailure(script.file, e))
-            previousDependencies
+            log(ResolutionFailure(scriptContents.file, e))
+            throw e
         }
+    }
+
+    private
+    fun createCacheKey(script: ScriptContents, environment: Environment): CacheKey? {
+        val filePath = script.file?.canonicalPath ?: return null
+        val buildscriptBlockHash = buildscriptBlockHashFor(script, environment) ?: return null
+        return CacheKey(filePath, buildscriptBlockHash)
     }
 
     private
     suspend fun assembleDependenciesFrom(
         scriptFile: File?,
-        environment: Environment,
-        buildscriptBlockHash: ByteArray?): KotlinScriptExternalDependencies {
+        environment: Environment
+    ): ScriptDependencyResult {
 
         val request = modelRequestFrom(scriptFile, environment)
         log(SubmittedModelRequest(scriptFile, request))
@@ -76,10 +97,10 @@ class KotlinBuildScriptDependenciesResolver : ScriptDependenciesResolver {
         val response = submit(request, progressLogger(scriptFile))
         log(ReceivedModelResponse(scriptFile, response))
 
-        val scriptDependencies = dependenciesFrom(response, buildscriptBlockHash)
+        val scriptDependencies = dependenciesFrom(response)
         log(ResolvedDependencies(scriptFile, scriptDependencies))
 
-        return scriptDependencies
+        return ScriptDependencyResult.Success(scriptDependencies)
     }
 
     private
@@ -122,85 +143,35 @@ class KotlinBuildScriptDependenciesResolver : ScriptDependenciesResolver {
 
     private
     fun dependenciesFrom(
-        response: KotlinBuildScriptModel,
-        hash: ByteArray?) =
+        response: KotlinBuildScriptModel) =
 
         KotlinBuildScriptDependencies(
             response.classPath,
             response.sourcePath,
-            response.implicitImports,
-            hash)
+            response.implicitImports
+        )
 
     private
     fun log(event: ResolverEvent) =
         ResolverEventLogger.log(event)
 }
 
+private
+fun buildscriptBlockHashFor(script: ScriptContents, environment: Environment): ByteArray? {
 
-/**
- * The resolver can either return the previous result
- * or request new dependency information from Gradle.
- */
-internal
-sealed class ResolverAction {
-    object ReturnPrevious : ResolverAction()
-    class RequestNew(val buildscriptBlockHash: ByteArray?) : ResolverAction()
-}
+    @Suppress("unchecked_cast")
+    val getScriptSectionTokens = environment["getScriptSectionTokens"] as? ScriptSectionTokensProvider ?: return null
+    val messageDigest = MessageDigest.getInstance("MD5")
+    val text = script.text ?: script.file?.readText() ?: return null
 
-
-internal
-object ResolverCoordinator {
-
-    /**
-     * Decides which action the resolver should take based on the given [script] and [environment].
-     */
-    fun selectNextActionFor(
-        script: ScriptContents,
-        environment: Environment?,
-        previousDependencies: KotlinScriptExternalDependencies?): ResolverAction =
-
-        when (environment) {
-            null -> ResolverAction.ReturnPrevious
-            else -> {
-                val buildscriptBlockHash = buildscriptBlockHashFor(script, environment)
-                if (sameBuildscriptBlockHashAs(previousDependencies, buildscriptBlockHash)) {
-                    ResolverAction.ReturnPrevious
-                } else {
-                    ResolverAction.RequestNew(buildscriptBlockHash)
-                }
-            }
+    fun updateWith(section: String) =
+        getScriptSectionTokens(text, section).forEach {
+            messageDigest.update(it.toString().toByteArray())
         }
 
-    private
-    fun sameBuildscriptBlockHashAs(previousDependencies: KotlinScriptExternalDependencies?, hash: ByteArray?) =
-        hash?.let { hash -> buildscriptBlockHashOf(previousDependencies)?.let { equals(it, hash) } } ?: false
-
-    private
-    fun buildscriptBlockHashOf(previousDependencies: KotlinScriptExternalDependencies?) =
-        (previousDependencies as? KotlinBuildScriptDependencies)?.buildscriptBlockHash
-
-    private
-    fun buildscriptBlockHashFor(script: ScriptContents, environment: Environment): ByteArray? {
-
-        @Suppress("unchecked_cast")
-        val getScriptSectionTokens = environment["getScriptSectionTokens"] as? ScriptSectionTokensProvider
-        return when (getScriptSectionTokens) {
-            null -> null
-            else ->
-                MessageDigest.getInstance("MD5").run {
-                    val text = script.text ?: script.file?.readText()
-                    text?.let { text ->
-                        fun updateWith(section: String) =
-                            getScriptSectionTokens(text, section).forEach {
-                                update(it.toString().toByteArray())
-                            }
-                        updateWith("buildscript")
-                        updateWith("plugins")
-                    }
-                    digest()
-                }
-        }
-    }
+    updateWith("buildscript")
+    updateWith("plugins")
+    return messageDigest.digest()
 }
 
 
@@ -210,10 +181,10 @@ typealias ScriptSectionTokensProvider = (CharSequence, String) -> Sequence<CharS
 
 internal
 class KotlinBuildScriptDependencies(
-    override val classpath: Iterable<File>,
-    override val sources: Iterable<File>,
-    override val imports: Iterable<String>,
-    val buildscriptBlockHash: ByteArray?) : KotlinScriptExternalDependencies
+    override val classpath: List<File>,
+    override val sources: List<File>,
+    override val imports: List<String>
+) : ScriptDependencies
 
 
 internal
