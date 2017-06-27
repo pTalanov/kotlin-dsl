@@ -24,11 +24,18 @@ import java.net.URI
 import java.security.MessageDigest
 import java.util.*
 import java.util.Arrays.equals
-import kotlin.script.dependencies.*
+import kotlin.script.dependencies.Environment
+import kotlin.script.dependencies.ScriptContents
+import kotlin.script.dependencies.ScriptDependencies
+import kotlin.script.dependencies.ScriptDependencyResult
 import kotlin.script.dependencies.experimental.AsyncScriptDependenciesResolver
 
 
-class KotlinBuildScriptDependenciesResolver : AsyncScriptDependenciesResolver {
+class KotlinBuildScriptDependenciesResolver internal constructor(
+    private val modelFetcher: KotlinBuiltScriptModelFetcher
+): AsyncScriptDependenciesResolver {
+
+    constructor(): this(KotlinBuildScriptModelFetcherImpl())
 
     private class CacheKey(val filePath: String, val buildscriptBlockHash: ByteArray) {
         override fun equals(other: Any?): Boolean {
@@ -67,9 +74,7 @@ class KotlinBuildScriptDependenciesResolver : AsyncScriptDependenciesResolver {
             }
 
             return assembleDependenciesFrom(scriptContents.file, environment).also {
-                if (cacheKey != null) {
-                    synchronized(cache) { cache[cacheKey] = it }
-                }
+                synchronized(cache) { cache[cacheKey] = it }
             }
 
         } catch (e: Exception) {
@@ -126,7 +131,7 @@ class KotlinBuildScriptDependenciesResolver : AsyncScriptDependenciesResolver {
 
     private
     suspend fun submit(request: KotlinBuildScriptModelRequest, progressListener: ProgressListener): KotlinBuildScriptModel =
-        fetchKotlinBuildScriptModelFor(request) {
+        modelFetcher.fetch(request) {
             addProgressListener(progressListener)
         }
 
@@ -154,6 +159,13 @@ class KotlinBuildScriptDependenciesResolver : AsyncScriptDependenciesResolver {
     private
     fun log(event: ResolverEvent) =
         ResolverEventLogger.log(event)
+}
+
+internal
+interface KotlinBuiltScriptModelFetcher {
+    suspend fun fetch(
+        request: KotlinBuildScriptModelRequest,
+        modelBuilderCustomization: ModelBuilderCustomization = {}): KotlinBuildScriptModel
 }
 
 private

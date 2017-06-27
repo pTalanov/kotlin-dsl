@@ -2,26 +2,15 @@ package org.gradle.kotlin.dsl.integration
 
 import org.gradle.kotlin.dsl.concurrent.future
 import org.gradle.kotlin.dsl.embeddedKotlinVersion
-
-import org.gradle.kotlin.dsl.fixtures.AbstractIntegrationTest
-import org.gradle.kotlin.dsl.fixtures.DeepThought
-import org.gradle.kotlin.dsl.fixtures.customDaemonRegistry
-import org.gradle.kotlin.dsl.fixtures.customInstallation
-import org.gradle.kotlin.dsl.fixtures.withDaemonRegistry
-import org.gradle.kotlin.dsl.fixtures.matching
-
+import org.gradle.kotlin.dsl.fixtures.*
 import org.gradle.kotlin.dsl.resolver.GradleInstallation
+import org.gradle.kotlin.dsl.resolver.KotlinBuildScriptModelFetcherImpl
 import org.gradle.kotlin.dsl.resolver.KotlinBuildScriptModelRequest
-import org.gradle.kotlin.dsl.resolver.fetchKotlinBuildScriptModelFor
 import org.gradle.kotlin.dsl.tooling.models.KotlinBuildScriptModel
-
 import org.gradle.util.TextUtil.normaliseFileSeparators
-
 import org.hamcrest.CoreMatchers.*
 import org.hamcrest.MatcherAssert.assertThat
-
 import org.junit.Test
-
 import java.io.File
 
 class KotlinBuildScriptModelIntegrationTest : AbstractIntegrationTest() {
@@ -250,7 +239,7 @@ internal
 fun kotlinBuildScriptModelFor(projectDir: File, scriptFile: File? = null): KotlinBuildScriptModel =
     withDaemonRegistry(customDaemonRegistry()) {
         future {
-            fetchKotlinBuildScriptModelFor(
+            KotlinBuildScriptModelFetcherImpl().fetch(
                 KotlinBuildScriptModelRequest(
                     projectDir = projectDir,
                     scriptFile = scriptFile,
