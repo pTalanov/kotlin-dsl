@@ -95,8 +95,12 @@ class KotlinScriptClassPathProvider(
         DefaultClassPath.of(gradleKotlinDslJars())
     }
 
-    fun compilationClassPathOf(scope: ClassLoaderScope): ClassPath =
-        gradleKotlinDsl + exportClassPathFromHierarchyOf(scope)
+    fun compilationClassPathOf(scope: ClassLoaderScope): ClassPath {
+        if (!scope.isLocked) {
+            scope.lock()
+        }
+        return gradleKotlinDsl + exportClassPathFromHierarchyOf(scope)
+    }
 
     private
     fun gradleKotlinDslExtensions(): File =
