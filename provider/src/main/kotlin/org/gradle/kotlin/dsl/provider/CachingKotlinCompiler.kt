@@ -27,6 +27,7 @@ import org.jetbrains.kotlin.script.KotlinScriptDefinition
 import java.io.File
 import kotlin.reflect.KClass
 import kotlin.script.dependencies.*
+import kotlin.script.dependencies.DependenciesResolver.*
 
 
 internal
@@ -175,14 +176,16 @@ class CachingKotlinCompiler(
     fun scriptDefinitionFromTemplate(template: KClass<out Any>) =
 
         object : KotlinScriptDefinition(template) {
-            override val dependencyResolver: ScriptDependenciesResolver
-                get() = object : ScriptDependenciesResolver {
-                    override fun resolve(
-                        scriptContents: ScriptContents,
-                        environment: Environment
-                    ) = ScriptDependencyResult.Success(object : ScriptDependencies {
-                        override val imports = implicitImports.list
-                    })
+            override val dependencyResolver: DependenciesResolver
+                get() = object : StaticDependenciesResolver {
+                    override fun resolve(environment: Environment): ResolveResult.Success {
+                        return ResolveResult.Success(
+                            ScriptDependencies(
+                                // TODO: this list is actually lazy, is it ok to compute it at this time?
+                                imports = implicitImports.list
+                            )
+                        )
+                    }
                 }
         }
 

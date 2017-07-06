@@ -59,7 +59,7 @@ class DependencyResolverTest {
     private
     class TrackingResolver {
         private val fetcher = TestModelFetcher()
-        private val resolver = KotlinBuildScriptDependenciesResolver(fetcher)
+        private val resolver = KotlinBuildScriptDependenciesResolverBase(fetcher)
 
         fun assertFetchesModel(environment: Environment) {
             Assert.assertTrue(checkFetches(environment))
@@ -111,7 +111,7 @@ object EmptyResponse : KotlinBuildScriptModel
 
 
 private
-class TestModelFetcher: KotlinBuiltScriptModelFetcher {
+class TestModelFetcher: BuildScriptModelFetcher {
     var timesModelRequested = 0
 
     suspend override fun fetch(

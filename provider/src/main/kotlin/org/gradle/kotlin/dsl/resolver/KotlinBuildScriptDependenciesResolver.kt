@@ -24,18 +24,20 @@ import java.net.URI
 import java.security.MessageDigest
 import java.util.*
 import java.util.Arrays.equals
+import kotlin.script.dependencies.DependenciesResolver.ResolveResult
 import kotlin.script.dependencies.Environment
 import kotlin.script.dependencies.ScriptContents
 import kotlin.script.dependencies.ScriptDependencies
-import kotlin.script.dependencies.ScriptDependencyResult
-import kotlin.script.dependencies.experimental.AsyncScriptDependenciesResolver
+import kotlin.script.dependencies.asSuccess
+import kotlin.script.dependencies.experimental.AsyncDependenciesResolver
 
 
-class KotlinBuildScriptDependenciesResolver internal constructor(
-    private val modelFetcher: KotlinBuiltScriptModelFetcher
-): AsyncScriptDependenciesResolver {
+// this is a workaround for kotlin pre 1.1.4 plugin version requiring primary constructor to be parameterless
+class KotlinBuildScriptDependenciesResolver: KotlinBuildScriptDependenciesResolverBase(RemoteBuildScriptModelFetcher())
 
-    constructor(): this(KotlinBuildScriptModelFetcherImpl())
+open class KotlinBuildScriptDependenciesResolverBase internal constructor(
+    private val modelFetcher: BuildScriptModelFetcher
+): AsyncDependenciesResolver {
 
     private class CacheKey(val filePath: String, val buildscriptBlockHash: ByteArray) {
         override fun equals(other: Any?): Boolean {
@@ -57,12 +59,12 @@ class KotlinBuildScriptDependenciesResolver internal constructor(
         }
     }
 
-    private val cache = SoftKeySoftValueHashMap<CacheKey, ScriptDependencyResult>()
+    private val cache = SoftKeySoftValueHashMap<CacheKey, ResolveResult>()
 
     override suspend fun resolveAsync(
         scriptContents: ScriptContents,
         environment: Environment
-    ): ScriptDependencyResult {
+    ): ResolveResult {
         try {
             val cacheKey = createCacheKey(scriptContents, environment)
             if (cacheKey != null) {
@@ -94,7 +96,7 @@ class KotlinBuildScriptDependenciesResolver internal constructor(
     suspend fun assembleDependenciesFrom(
         scriptFile: File?,
         environment: Environment
-    ): ScriptDependencyResult {
+    ): ResolveResult {
 
         val request = modelRequestFrom(scriptFile, environment)
         log(SubmittedModelRequest(scriptFile, request))
@@ -105,7 +107,7 @@ class KotlinBuildScriptDependenciesResolver internal constructor(
         val scriptDependencies = dependenciesFrom(response)
         log(ResolvedDependencies(scriptFile, scriptDependencies))
 
-        return ScriptDependencyResult.Success(scriptDependencies)
+        return scriptDependencies.asSuccess()
     }
 
     private
@@ -150,10 +152,10 @@ class KotlinBuildScriptDependenciesResolver internal constructor(
     fun dependenciesFrom(
         response: KotlinBuildScriptModel) =
 
-        KotlinBuildScriptDependencies(
-            response.classPath,
-            response.sourcePath,
-            response.implicitImports
+        ScriptDependencies(
+            classpath = response.classPath,
+            sources = response.sourcePath,
+            imports = response.implicitImports
         )
 
     private
@@ -162,7 +164,7 @@ class KotlinBuildScriptDependenciesResolver internal constructor(
 }
 
 internal
-interface KotlinBuiltScriptModelFetcher {
+interface BuildScriptModelFetcher {
     suspend fun fetch(
         request: KotlinBuildScriptModelRequest,
         modelBuilderCustomization: ModelBuilderCustomization = {}): KotlinBuildScriptModel
@@ -189,14 +191,6 @@ fun buildscriptBlockHashFor(script: ScriptContents, environment: Environment): B
 
 internal
 typealias ScriptSectionTokensProvider = (CharSequence, String) -> Sequence<CharSequence>
-
-
-internal
-class KotlinBuildScriptDependencies(
-    override val classpath: List<File>,
-    override val sources: List<File>,
-    override val imports: List<String>
-) : ScriptDependencies
 
 
 internal

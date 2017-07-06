@@ -51,7 +51,7 @@ internal
 typealias ModelBuilderCustomization = ModelBuilder<KotlinBuildScriptModel>.() -> Unit
 
 
-internal class KotlinBuildScriptModelFetcherImpl : KotlinBuiltScriptModelFetcher {
+internal class RemoteBuildScriptModelFetcher : BuildScriptModelFetcher {
     override suspend fun fetch(
         request: KotlinBuildScriptModelRequest,
         modelBuilderCustomization: ModelBuilderCustomization): KotlinBuildScriptModel

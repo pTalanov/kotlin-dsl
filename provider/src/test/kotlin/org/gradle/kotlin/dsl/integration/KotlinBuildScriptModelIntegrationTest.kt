@@ -4,7 +4,7 @@ import org.gradle.kotlin.dsl.concurrent.future
 import org.gradle.kotlin.dsl.embeddedKotlinVersion
 import org.gradle.kotlin.dsl.fixtures.*
 import org.gradle.kotlin.dsl.resolver.GradleInstallation
-import org.gradle.kotlin.dsl.resolver.KotlinBuildScriptModelFetcherImpl
+import org.gradle.kotlin.dsl.resolver.RemoteBuildScriptModelFetcher
 import org.gradle.kotlin.dsl.resolver.KotlinBuildScriptModelRequest
 import org.gradle.kotlin.dsl.tooling.models.KotlinBuildScriptModel
 import org.gradle.util.TextUtil.normaliseFileSeparators
@@ -239,7 +239,7 @@ internal
 fun kotlinBuildScriptModelFor(projectDir: File, scriptFile: File? = null): KotlinBuildScriptModel =
     withDaemonRegistry(customDaemonRegistry()) {
         future {
-            KotlinBuildScriptModelFetcherImpl().fetch(
+            RemoteBuildScriptModelFetcher().fetch(
                 KotlinBuildScriptModelRequest(
                     projectDir = projectDir,
                     scriptFile = scriptFile,
